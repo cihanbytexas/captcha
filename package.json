@@ -1,0 +1,17 @@
+{
+  "name": "captcha-api",
+  "version": "1.0.0",
+  "description": "Vercel uyumlu Captcha API",
+  "main": "api/captcha.js",
+  "scripts": {
+    "start": "node api/captcha.js"
+  },
+  "author": "YourName",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^2.12.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
