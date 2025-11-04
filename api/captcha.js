@@ -1,5 +1,3 @@
-// api/captcha.js
-
 // Rastgele harf üretme
 function randomWord(length = 5) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -20,11 +18,10 @@ function randomColor(min = 0, max = 255) {
 
 // SVG tabanlı Captcha üret
 function generateSVG(word) {
-  const width = 400; // biraz geniş tutuyorum, netlik için
+  const width = 400;
   const height = 120;
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`;
 
-  // Arka plan
   svg += `<rect width="100%" height="100%" fill="#f6f6f6"/>`;
 
   // Karışık çizgiler
@@ -43,15 +40,14 @@ function generateSVG(word) {
     svg += `<rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="1" height="1" fill="${randomColor(100,230)}" />`;
   }
 
-  // Harfleri rastgele büyük ölçüde çiz (daha okunaksız ama doğrulanabilir)
+  // Harfler
   for (let i = 0; i < word.length; i++) {
-    const x = 40 + i * ( (width - 80) / word.length );
-    const baselineJitter = (Math.random() - 0.5) * 30; // vertical jitter
+    const x = 40 + i * ((width - 80) / word.length);
+    const baselineJitter = (Math.random() - 0.5) * 30;
     const y = 70 + baselineJitter;
-    const rotate = (Math.random() - 0.5) * 30; // -15 .. 15 derece
+    const rotate = (Math.random() - 0.5) * 30;
     const fontSize = 40 + Math.round(Math.random() * 20);
     const color = randomColor(20, 160);
-    // Slight letter-spacing transform to vary positions:
     svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="Verdana,Arial,sans-serif" font-size="${fontSize}" fill="${color}" transform="rotate(${rotate.toFixed(2)} ${x.toFixed(1)} ${y.toFixed(1)})" style="letter-spacing:3px">${word[i]}</text>`;
   }
 
@@ -59,8 +55,63 @@ function generateSVG(word) {
   return svg;
 }
 
-// SVG -> base64 (raw svg content)
-function svgToBase64Raw(svg) {
+// SVG -> base64
+function svgToBase64(svg) {
+  return Buffer.from(svg).toString("base64");
+}
+
+// CommonJS handler
+module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
+  }
+
+  try {
+    const IMGBB_KEY = process.env.IMGBB_KEY;
+    if (!IMGBB_KEY) {
+      return res.status(500).json({ error: "IMGBB_KEY not set in env." });
+    }
+
+    const captchaText = randomWord(6);
+    const svg = generateSVG(captchaText);
+    const svgBase64 = svgToBase64(svg);
+
+    // imgBB upload
+    const params = new URLSearchParams();
+    params.append("key", IMGBB_KEY);
+    params.append("image", svgBase64);
+
+    const uploadRes = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString()
+    });
+
+    if (!uploadRes.ok) {
+      const txt = await uploadRes.text();
+      return res.status(502).json({ error: "Failed to upload to imgBB", status: uploadRes.status, body: txt });
+    }
+
+    const uploadJson = await uploadRes.json();
+    const imageUrl = (uploadJson?.data?.display_url || uploadJson?.data?.url) || null;
+
+    if (!imageUrl) {
+      return res.status(502).json({ error: "imgBB did not return an image URL", raw: uploadJson });
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    return res.status(200).json({
+      gorsel_url: imageUrl,
+      captcha_word: captchaText
+    });
+
+  } catch (err) {
+    console.error("captcha error:", err);
+    res.setHeader("Content-Type", "application/json");
+    return res.status(500).json({ error: "Internal server error", details: String(err) });
+  }
+};function svgToBase64Raw(svg) {
   return Buffer.from(svg).toString("base64"); // return raw base64 (no data: prefix)
 }
 
