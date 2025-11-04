@@ -38,7 +38,7 @@ function generateSVG(word) {
   for (let i = 0; i < word.length; i++) {
     const x = 20 + i * 30;
     const y = 35 + Math.random() * 20;
-    const rotate = (Math.random() - 0.5) * 30; // -15 ~ 15 derece
+    const rotate = (Math.random() - 0.5) * 30;
     const color = randomColor(50, 160);
     svg += `<text x="${x}" y="${y}" font-size="30" fill="${color}" transform="rotate(${rotate} ${x} ${y})">${word[i]}</text>`;
   }
@@ -52,7 +52,8 @@ function svgToBase64(svg) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
-export default async function handler(req, res) {
+// CommonJS handler
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -61,6 +62,11 @@ export default async function handler(req, res) {
   const svg = generateSVG(captchaText);
   const captchaImage = svgToBase64(svg);
 
+  res.status(200).json({
+    gorsel_url: captchaImage,
+    captcha_word: captchaText
+  });
+};
   res.status(200).json({
     gorsel_url: captchaImage,
     captcha_word: captchaText
