@@ -21,7 +21,7 @@ function generateSVG(word) {
   const width = 200;
   const height = 70;
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`;
-  
+
   // Arka plan
   svg += `<rect width="100%" height="100%" fill="#f0f0f0"/>`;
 
@@ -67,17 +67,3 @@ module.exports = async function handler(req, res) {
     captcha_word: captchaText
   });
 };
-  res.status(200).json({
-    gorsel_url: captchaImage,
-    captcha_word: captchaText
-  });
-}    ctx.restore();
-  }
-
-  const captchaImage = canvas.toDataURL(); // Base64 format
-
-  res.status(200).json({
-    gorsel_url: captchaImage,
-    captcha_word: captchaText
-  });
-}
