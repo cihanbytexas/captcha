@@ -9,7 +9,7 @@
   "author": "YourName",
   "license": "MIT",
   "dependencies": {
-    "canvas": "^2.12.0"
+    "canvas": "^2.11.2"
   },
   "engines": {
     "node": "22.x"
