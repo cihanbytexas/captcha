@@ -1,4 +1,6 @@
-// Rastgele harf üretme
+const fetch = require("node-fetch"); // Vercel Node 22+ ile global fetch var, istersen require kaldırabilirsin
+
+// Rastgele harf üret
 function randomWord(length = 5) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let word = "";
@@ -16,51 +18,95 @@ function randomColor(min = 0, max = 255) {
   return `rgb(${r},${g},${b})`;
 }
 
-// SVG tabanlı Captcha üret
+// SVG captcha oluştur
 function generateSVG(word) {
   const width = 400;
   const height = 120;
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`;
-
   svg += `<rect width="100%" height="100%" fill="#f6f6f6"/>`;
 
-  // Karışık çizgiler
   for (let i = 0; i < 7; i++) {
     const x1 = Math.random() * width;
     const y1 = Math.random() * height;
     const x2 = Math.random() * width;
     const y2 = Math.random() * height;
-    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${randomColor()}" stroke-width="${(1 + Math.random()*2).toFixed(1)}" stroke-opacity="0.7"/>`;
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${randomColor()}" stroke-width="${1 + Math.random()*2}" stroke-opacity="0.7"/>`;
   }
 
-  // Noktalar (noise)
   for (let i = 0; i < 200; i++) {
     const cx = Math.random() * width;
     const cy = Math.random() * height;
-    svg += `<rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="1" height="1" fill="${randomColor(100,230)}" />`;
+    svg += `<rect x="${cx}" y="${cy}" width="1" height="1" fill="${randomColor(100,230)}"/>`;
   }
 
-  // Harfler
   for (let i = 0; i < word.length; i++) {
     const x = 40 + i * ((width - 80) / word.length);
     const baselineJitter = (Math.random() - 0.5) * 30;
     const y = 70 + baselineJitter;
     const rotate = (Math.random() - 0.5) * 30;
     const fontSize = 40 + Math.round(Math.random() * 20);
-    const color = randomColor(20, 160);
-    svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="Verdana,Arial,sans-serif" font-size="${fontSize}" fill="${color}" transform="rotate(${rotate.toFixed(2)} ${x.toFixed(1)} ${y.toFixed(1)})" style="letter-spacing:3px">${word[i]}</text>`;
+    const color = randomColor(20,160);
+    svg += `<text x="${x}" y="${y}" font-family="Verdana,Arial,sans-serif" font-size="${fontSize}" fill="${color}" transform="rotate(${rotate} ${x} ${y})" style="letter-spacing:3px">${word[i]}</text>`;
   }
 
   svg += `</svg>`;
   return svg;
 }
 
-// SVG -> base64
+// SVG -> Base64
 function svgToBase64(svg) {
   return Buffer.from(svg).toString("base64");
 }
 
 // CommonJS handler
+module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
+  }
+
+  try {
+    const IMGBB_KEY = process.env.IMGBB_KEY;
+    if (!IMGBB_KEY) return res.status(500).json({ error: "IMGBB_KEY not set." });
+
+    const captchaText = randomWord(6);
+    const svg = generateSVG(captchaText);
+    const svgBase64 = svgToBase64(svg);
+
+    const params = new URLSearchParams();
+    params.append("key", IMGBB_KEY);
+    params.append("image", svgBase64);
+
+    const uploadRes = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString()
+    });
+
+    if (!uploadRes.ok) {
+      const txt = await uploadRes.text();
+      return res.status(502).json({ error: "Failed to upload to imgBB", status: uploadRes.status, body: txt });
+    }
+
+    const uploadJson = await uploadRes.json();
+    const imageUrl = uploadJson?.data?.display_url || uploadJson?.data?.url;
+
+    if (!imageUrl) {
+      return res.status(502).json({ error: "imgBB did not return an image URL", raw: uploadJson });
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    return res.status(200).json({
+      gorsel_url: imageUrl,
+      captcha_word: captchaText
+    });
+
+  } catch (err) {
+    console.error("captcha error:", err);
+    res.setHeader("Content-Type", "application/json");
+    return res.status(500).json({ error: "Internal server error", details: String(err) });
+  }
+};// CommonJS handler
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
